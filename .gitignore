@@ -1,0 +1,8 @@
+/build/
+/cmake-build-*/
+/out/
+*.o
+*.obj
+*.exe
+figgie_demo
+.DS_Store
