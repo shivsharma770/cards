@@ -6,3 +6,4 @@
 *.exe
 figgie_demo
 .DS_Store
+*.log

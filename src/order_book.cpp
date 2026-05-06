@@ -27,6 +27,16 @@ namespace {
 
 }  // namespace
 
+float OrderBook::get_mid_price(Suit suit) const noexcept {
+  const auto i = static_cast<std::size_t>(suit);
+  if (bids_[i].empty() || asks_[i].empty()) {
+    return -1.0f;
+  }
+  const float best_bid = static_cast<float>(bids_[i].front().price);
+  const float best_ask = static_cast<float>(asks_[i].front().price);
+  return (best_bid + best_ask) * 0.5f;
+}
+
 void OrderBook::clear_entire_book() noexcept {
   for (auto& b : bids_) {
     b.clear();

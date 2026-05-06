@@ -21,6 +21,10 @@ class Game {
   /// Runs `kTicksPerRound` ticks (each bot acts once per tick), logs trades, then settles the round.
   void run_round(std::mt19937& rng);
 
+  /// Sets up another round in the same game: same players (chips and bot state persist),
+  /// fresh ante, fresh deal, fresh pot, fresh order book, new hidden goal suit.
+  void start_next_round(std::mt19937& rng);
+
   [[nodiscard]] std::int32_t pot() const noexcept { return pot_; }
 
   [[nodiscard]] std::array<std::unique_ptr<Player>, kPlayerCount>& players() noexcept {
@@ -41,7 +45,7 @@ class Game {
   }
 
  private:
-  void initialize_round(std::mt19937& rng);
+  void initialize_round(std::mt19937& rng, bool first_round);
 
   void settle_round();
 

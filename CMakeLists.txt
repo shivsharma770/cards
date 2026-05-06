@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(figgie_core STATIC
   src/deck.cpp
   src/game.cpp
+  src/market_maker.cpp
   src/order_book.cpp
   src/random_bot.cpp
 )
@@ -19,3 +20,19 @@ add_executable(figgie_demo
   src/main.cpp
 )
 target_link_libraries(figgie_demo PRIVATE figgie_core)
+
+enable_testing()
+
+add_executable(figgie_tests
+  tests/test_main.cpp
+)
+target_link_libraries(figgie_tests PRIVATE figgie_core)
+
+# Ensure assert() always fires, even when building Release.
+if(MSVC)
+  target_compile_options(figgie_tests PRIVATE /UNDEBUG)
+else()
+  target_compile_options(figgie_tests PRIVATE -UNDEBUG)
+endif()
+
+add_test(NAME figgie_tests COMMAND figgie_tests)

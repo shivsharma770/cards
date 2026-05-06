@@ -9,6 +9,11 @@ namespace figgie {
 
 void RandomBot::act(OrderBook& book, std::array<Player*, kPlayerCount>& players,
                     std::size_t seat_index, std::mt19937& rng) {
+  std::uniform_int_distribution<int> drift_dist(-1, 1);
+  for (auto& fair_value : fair_values) {
+    fair_value = std::clamp<std::int32_t>(fair_value + drift_dist(rng), 5, 35);
+  }
+
   std::uniform_int_distribution<int> mode_dist(0, 2);
   const int mode = mode_dist(rng);
 
@@ -22,9 +27,10 @@ void RandomBot::act(OrderBook& book, std::array<Player*, kPlayerCount>& players,
     }
     std::uniform_int_distribution<int> suit_dist(0, static_cast<int>(kSuitCount) - 1);
     const Suit suit = static_cast<Suit>(suit_dist(rng));
-    std::uniform_int_distribution<std::int32_t> price_dist(1, bankroll);
-    const std::int32_t price = price_dist(rng);
-    book.submit_bid(players, seat_index, suit, price);
+    const std::int32_t bid_price = fair_values[static_cast<std::size_t>(suit)] - 2;
+    if (bid_price > 0 && bid_price <= bankroll) {
+      (void)book.submit_bid(players, seat_index, suit, bid_price);
+    }
     return;
   }
 
@@ -35,11 +41,8 @@ void RandomBot::act(OrderBook& book, std::array<Player*, kPlayerCount>& players,
   std::uniform_int_distribution<std::size_t> pick_card(0, hand.size() - 1);
   const Suit suit = hand[pick_card(rng)].suit;
 
-  const std::int32_t max_price = std::max<std::int32_t>(1, bankroll);
-  std::uniform_int_distribution<std::int32_t> price_dist(1, max_price);
-  const std::int32_t price = price_dist(rng);
-
-  book.submit_ask(players, seat_index, suit, price);
+  const std::int32_t ask_price = fair_values[static_cast<std::size_t>(suit)] + 2;
+  (void)book.submit_ask(players, seat_index, suit, ask_price);
 }
 
 }  // namespace figgie

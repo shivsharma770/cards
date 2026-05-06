@@ -50,6 +50,11 @@ class OrderBook {
 
   [[nodiscard]] const std::vector<Trade>& trades() const noexcept { return trades_; }
 
+  /// Mid-market signal for `suit`: average of best bid and best ask. Returns
+  /// `-1.0f` if either side of the book is empty (i.e. there is no usable
+  /// signal — caller should not feed -1 into a price model).
+  [[nodiscard]] float get_mid_price(Suit suit) const noexcept;
+
  private:
   void clear_entire_book() noexcept;
 

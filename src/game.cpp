@@ -5,7 +5,10 @@
 #include "figgie/random_bot.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <iomanip>
 #include <iostream>
+#include <thread>
 #include <vector>
 
 namespace figgie {
@@ -21,6 +24,26 @@ namespace {
   return Suit::Spades;  // Invalid distribution; unreachable for generated decks.
 }
 
+// ANSI 256-colour FG codes; reset is "\033[0m". Hearts/Diamonds get red, the
+// black suits get bright white so they pop on dark terminals.
+[[nodiscard]] const char* suit_color(Suit s) noexcept {
+  return (s == Suit::Hearts || s == Suit::Diamonds) ? "\033[31m" : "\033[97m";
+}
+
+[[nodiscard]] const char* suit_glyph(Suit s) noexcept {
+  switch (s) {
+    case Suit::Spades:
+      return "\xe2\x99\xa0";  // ♠
+    case Suit::Clubs:
+      return "\xe2\x99\xa3";  // ♣
+    case Suit::Hearts:
+      return "\xe2\x99\xa5";  // ♥
+    case Suit::Diamonds:
+      return "\xe2\x99\xa6";  // ♦
+  }
+  return "?";
+}
+
 }  // namespace
 
 Suit Game::compute_goal_suit(const SuitDistribution& dist) noexcept {
@@ -28,16 +51,19 @@ Suit Game::compute_goal_suit(const SuitDistribution& dist) noexcept {
   return partner_suit_same_color(long_suit);
 }
 
-void Game::initialize_round(std::mt19937& rng) {
+void Game::initialize_round(std::mt19937& rng, bool first_round) {
   auto [deck, dist] = make_shuffled_deck_with_distribution(rng);
 
   goal_suit_ = compute_goal_suit(dist);
-
   pot_ = kInitialPot;
+  order_book_ = OrderBook{};
 
   for (std::size_t p = 0; p < kPlayerCount; ++p) {
-    players_[p] = std::make_unique<RandomBot>();
-    players_[p]->bankroll = kStartingBankroll - kAnteAmount;
+    if (first_round) {
+      players_[p] = std::make_unique<RandomBot>();
+      players_[p]->bankroll = kStartingBankroll;
+    }
+    players_[p]->bankroll -= kAnteAmount;
     players_[p]->hand.clear();
     players_[p]->hand.reserve(kCardsPerPlayer);
     for (std::size_t c = 0; c < kCardsPerPlayer; ++c) {
@@ -46,7 +72,9 @@ void Game::initialize_round(std::mt19937& rng) {
   }
 }
 
-Game::Game(std::mt19937& rng) { initialize_round(rng); }
+Game::Game(std::mt19937& rng) { initialize_round(rng, /*first_round=*/true); }
+
+void Game::start_next_round(std::mt19937& rng) { initialize_round(rng, /*first_round=*/false); }
 
 void Game::run_round(std::mt19937& rng) {
   std::cout << "--- Trading: " << kTicksPerRound << " ticks, " << kPlayerCount << " seats ---\n";
@@ -60,8 +88,20 @@ void Game::run_round(std::mt19937& rng) {
       const auto& trades = order_book_.trades();
       while (trade_cursor < trades.size()) {
         const auto& t = trades[trade_cursor++];
-        std::cout << "[trade #" << t.sequence << "] tick=" << tick << " suit=" << suit_name(t.suit)
-                  << " buyer=" << t.buyer << " seller=" << t.seller << " price=" << t.price << "\n";
+        if constexpr (kTradeDisplayDelayMs > 0) {
+          std::cout << "  \033[36m#" << std::setw(5) << std::setfill('0') << t.sequence
+                    << "\033[0m  \033[90mtick " << std::setw(3) << std::setfill(' ') << tick
+                    << "\033[0m  " << suit_color(t.suit) << suit_glyph(t.suit) << ' '
+                    << suit_name(t.suit) << "\033[0m"
+                    << "  \033[32mP" << t.buyer << "\033[0m \033[90m<--\033[0m "
+                    << "\033[31mP" << t.seller << "\033[0m"
+                    << "  \033[1;33m@ " << t.price << "\033[0m chips\n";
+          std::cout.flush();
+          std::this_thread::sleep_for(std::chrono::milliseconds(kTradeDisplayDelayMs));
+        } else {
+          std::cout << "[trade #" << t.sequence << "] tick=" << tick << " suit=" << suit_name(t.suit)
+                    << " buyer=" << t.buyer << " seller=" << t.seller << " price=" << t.price << "\n";
+        }
       }
     }
   }
@@ -123,7 +163,7 @@ void Game::settle_round() {
     std::cout << "Majority bonus: 0 (empty pot or no eligible majority)\n";
   }
 
-  std::cout << "\n--- Final leaderboard (by chips) ---\n";
+  std::cout << "\n--- Standings (by chips) ---\n";
   std::vector<std::size_t> order(kPlayerCount);
   for (std::size_t i = 0; i < kPlayerCount; ++i) {
     order[i] = i;
